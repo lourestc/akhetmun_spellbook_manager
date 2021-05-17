@@ -5,6 +5,8 @@ import pickle
 import lxml.html
 import pandas as pd
 import re
+import csv
+import sys
 
 # resolver spells 'as X'
 # ORDENAR SOURCES // "Also appears in"
@@ -26,8 +28,8 @@ def transcribe_PF(filename):
 		s.description = row['description']
 		
 		s.schools = row['school']
-		s.subschools.add( row['subschool'] )
-		s.descriptors.add( row['descriptor'] )
+		s.subschools.update( row['subschool'] )
+		s.descriptors.update( row['descriptor'] )
 		
 		for clvl in row['spell_level'].split(','):
 			clist,lvl = clvl.rsplit(' ',1)
@@ -80,10 +82,13 @@ def transcribe_DND(pathname):
 		s.name = spellhtml.cssselect('h2')[0].text_content()
 		#print( s.name )
 		
-		s.description = spellhtml.cssselect('div.nice-textile')[0].text_content()
+		s.description = spellhtml.cssselect('div.nice-textile')[0].text_content().strip()
 		spellhtml.cssselect('div.nice-textile')[0].drop_tree()
 		
 		s.schools = spellhtml.cssselect('a[href^="../../schools/"]')[0].text_content()
+		
+		s.subschools.update([x.text_content() for x in spellhtml.cssselect('a[href^="../../sub-schools/"]')])
+		s.descriptors.update([x.text_content() for x in spellhtml.cssselect('a[href^="../../descriptors/"]')])
 		
 		classes = spellhtml.cssselect('a[href^="../../../classes/"]')
 		for clvl in classes:
@@ -131,7 +136,33 @@ def transcribe_DND(pathname):
 		
 	print( len(library), " D&D spells found!" )
 	
+	save_DND_to_csv(library,'dndtools_spells.csv')
+	
 	return library
+	
+def save_DND_to_csv(library,filename):
+	with open(filename, 'w', encoding='UTF8') as csvfile:
+		writer = csv.writer(csvfile)
+		writer.writerow([ 'name', 'schools', 'subschools', 'descriptors', 'levels', 'components', 'castingtime', 'range', 'target', 'effect', 'area', 'duration', 'saving', 'SR', 'description', 'edition', 'source', 'url' ])
+		for s in library:
+			writer.writerow([	s.name,
+									s.schools,
+									', '.join([subs for subs in s.subschools]),
+									', '.join([subs for subs in s.descriptors]),
+									', '.join([c+' '+str(l) for c,l in s.levels.items()]),
+									', '.join([subs for subs in s.components]),
+									s.castingtime,
+									s.range,
+									s.target,
+									s.effect,
+									s.area,
+									s.duration,
+									s.saving,
+									s.SR,
+									s.description,
+									s.edition,
+									s.source,
+									s.url ])
 
 if __name__ == '__main__':
 
